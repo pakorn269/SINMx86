@@ -98,18 +98,18 @@ Public Class SMARTInfo
             LoadSmartRecords(False)
         End If
 
-        ' WMI lekérdezés -> S.M.A.R.T alapértékek
+       ' WMI query -> S.M.A.R.T default values
         objSM = New ManagementObjectSearcher("ROOT\WMI", "SELECT VendorSpecific FROM MSStorageDriver_ATAPISmartData WHERE InstanceName = '" + SmartID + "'")
 
-        ' Értékek beállítása -> A küszöbértékek kivételével minden itt van tárolva (rekord száma, legrosszabb és az aktuális nyers adat)
+        ' Set values -> Everything except the thresholds is stored here (record number, worst and the current raw data)
         For Each Me.objMgmt In objSM.Get()
             SmartData = objMgmt("VendorSpecific")
         Next
 
-        ' WMI lekérdezés -> S.M.A.R.T küszöbértékek
+       ' WMI Query -> S.M.A.R.T Thresholds
         objST = New ManagementObjectSearcher("ROOT\WMI", "SELECT VendorSpecific FROM MSStorageDriver_FailurePredictThresholds WHERE InstanceName = '" + SmartID + "'")
 
-        ' Értékek beállítása -> Küszöbértékek
+       ' Set values -> Thresholds
         For Each Me.objMgmt In objST.Get()
             SmartTreshold = objMgmt("VendorSpecific")
         Next
@@ -336,30 +336,30 @@ Public Class SMARTInfo
     ' Kimenet: *   -> hamis érték (Boolean)
     Private Function LoadSmartRecords(ByVal DiskIsSSD As Boolean)
 
-        ' Értékek definiálása
+        ' Defining values
         Dim RecordCount As Int32                                ' Rekord számláló
         Dim ArrayCount As Int32                                 ' Tömb számláló
 
-        ' Kritikus rekordok -> Ezeknek rendszerint 0 értéket kell mutatniuk, ha minden rendben!
-        ' Megjegyzés: Ha nem 0, akkor figyelmeztetés, a beállított küszöböt átlépve kritikus értéket vesz fel!
-        ' Rekordok: Reallocated Sectors, Spin Retry Count, End-to-End Errors, Reallocation Events, Current Pending Sectors, Off-Line Uncorrectable Sectors.
+        ' Critical records -> These should normally show a value of 0 if everything is fine!
+         ' Note: If it is not 0, then it is a warning, a critical value is reached when the set threshold is exceeded!
+         ' Records: Reallocated Sectors, Spin Retry Count, End-to-End Errors, Reallocation Events, Current Pending Sectors, Off-Line Uncorrectable Sectors.
         Dim CriticalRecords() As Int32 = {5, 10, 184, 196, 197, 198}
 
-        ' Figyelmeztető rekordok -> Ezeknek egy értéket meghaladóan csak figyelmeztetést kell megjeleníteni!
-        ' Megjegyzés: A beállított köszöböt átlépve figyelmeztetés!
-        ' Rekordok: Reported Uncorrectable Errors, Command Timeout, Off-Line Uncorrectable Sectors.
+        ' Warning records -> Only a warning should be displayed for these records exceeding a value!
+         ' Note: Crossing the set threshold is a warning!
+         ' Records: Reported Uncorrectable Errors, Command Timeout, Off-Line Uncorrectable Sectors.
         Dim WarningRecords() As Int32 = {187, 188, 199}
 
-        ' Hőmérsékletet tartalmazó rekordok -> Kizárólag a konvertáltak!
-        ' Megjegyzés: A köszöb elérése előtt figyelmeztetési állapotot kap!
-        ' Rekordok: Airflow Temperature, Disk Temperature.
+       ' Records containing temperature -> Converted only!
+         ' Note: You will receive a warning status before reaching the threshold!
+         ' Records: Airflow Temperature, Disk Temperature.
         Dim TemperatureRecords() As Int32 = {190, 194}
 
-        ' Alapértelmezett érték (A '0'-ás rekord nincs definiálva!)
+       ' Default value (Record '0' is not defined!)
         SmartRecord(0) = "Vendor Specific Record"
 
-        ' Ismert elemek feltöltése: HDD-re és SSD-re is jellemző rekordok
-        ' Megjegyzés: Az SSD-knél eltérő értékek később felül lesznek írva!
+       ' Uploading known elements: records specific to both HDD and SSD
+         ' Note: Different values for SSDs will be overwritten later!
         SmartRecord(1) = "Read Error Rate"
         SmartRecord(2) = "Throughput Performance"
         SmartRecord(3) = "Spin-Up Time"
@@ -425,7 +425,7 @@ Public Class SMARTInfo
         SmartRecord(251) = "Minimum Spares Remaining"
         SmartRecord(254) = "Free Fall Event Count"
 
-        ' Csak SSD-re jellemző rekordok vagy eltérő rekordok felülírása
+       ' Overwrite SSD-only records or different records
         If DiskIsSSD Then
             SmartRecord(100) = "Erase/Program Cycles"
             SmartRecord(170) = "Reserved Block Count"
@@ -452,7 +452,7 @@ Public Class SMARTInfo
             SmartRecord(252) = "Newly Added Bad Flash Block"
         End If
 
-        ' Üres rekord nevek feltöltése
+        ' Upload empty record names
         For RecordCount = 1 To UBound(SmartRecord)
             If IsNothing(SmartRecord(RecordCount)) Then
                 SmartRecord(RecordCount) = SmartRecord(0)
