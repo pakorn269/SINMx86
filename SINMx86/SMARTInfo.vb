@@ -98,97 +98,97 @@ Public Class SMARTInfo
             LoadSmartRecords(False)
         End If
 
-        ' WMI lekérdezés -> S.M.A.R.T alapértékek
+        ' WMI query -> S.M.A.R.T default values
         objSM = New ManagementObjectSearcher("ROOT\WMI", "SELECT VendorSpecific FROM MSStorageDriver_ATAPISmartData WHERE InstanceName = '" + SmartID + "'")
 
-        ' Értékek beállítása -> A küszöbértékek kivételével minden itt van tárolva (rekord száma, legrosszabb és az aktuális nyers adat)
+        ' Set values -> Everything except the thresholds is stored here (record number, worst and the current raw data)
         For Each Me.objMgmt In objSM.Get()
             SmartData = objMgmt("VendorSpecific")
         Next
 
-        ' WMI lekérdezés -> S.M.A.R.T küszöbértékek
+        ' WMI Query -> S.M.A.R.T Thresholds
         objST = New ManagementObjectSearcher("ROOT\WMI", "SELECT VendorSpecific FROM MSStorageDriver_FailurePredictThresholds WHERE InstanceName = '" + SmartID + "'")
 
-        ' Értékek beállítása -> Küszöbértékek
+       ' Set values -> Thresholds
         For Each Me.objMgmt In objST.Get()
             SmartTreshold = objMgmt("VendorSpecific")
         Next
 
-        ' Értékek rendezése (Ameddig tart a lista!)
+       ' Sort values (As long as the list lasts!)
         While SmartData(SmartCount + SmartColunms(0)) <> 0
 
-            ' Rekord változóinak beállítása
+            ' Set record variables
             RecordNumber = ToInt32(SmartData(SmartCount + SmartColunms(0)))
             RecordName = SmartRecord(RecordNumber)
             RecordTreshold = ToInt32(SmartTreshold(SmartCount + SmartColunms(1)))
             RecordValue = ToInt32(SmartData(SmartCount + SmartColunms(2)))
             RecordWorst = ToInt32(SmartData(SmartCount + SmartColunms(3)))
 
-            ' Rekord nevének formázása (nyers és formázott értékek)
+           ' Record name formatting (raw and formatted values)
             RecordName = Replace(RecordName, "RAW", GetLoc("SMARTRaw"))
             RecordName = Replace(RecordName, "Converted", GetLoc("SMARTConvert"))
 
-            ' Lista feltöltése
+           ' Upload list
             ListFields(1) = RecordNumber.ToString
             ListFields(2) = RecordName
             ListFields(3) = RecordTreshold.ToString
             ListFields(4) = RecordValue.ToString
             ListFields(5) = RecordWorst.ToString
 
-            ' Kapott érték alaphelyzetbe állítása (Több értékből származtatva!)
+            ' Reset received value (Derived from several values!)
             ValueSum = 0
 
-            ' Eltérő értékek kezelése
+            ' Handling different values
             If RecordNumber = 190 Or RecordNumber = 194 Then
 
-                ' Hőmérséklet értékek formázása (Az aktuális érték az első helyen van, ezért csak az van figyelembe véve!)
+                ' Formatting temperature values (The current value is in the first place, so only it is taken into account!)
                 ValueSum = ToInt32(SmartData(SmartCount + SmartColunms(4)))
                 ListFields(7) = ValueSum.ToString + " °C"
 
-                ' Nyers adat felülbírálása (Celsius érték beállítása)
+                ' Override raw data (set Celsius value)
                 RecordRawValue = ValueSum
 
-                ' Hőmérséklet érték átalakítása (Celsius -> Fahrenheit) és hozzáadása a formázott sztringhez 
+                ' Convert a temperature value (Celsius -> Fahrenheit) and add it to the formatted string
                 ValueSum = Round((9 * ValueSum / 5) + 32)
                 ListFields(7) += " / " + ValueSum.ToString + " °F"
 
             ElseIf RecordNumber = 9 Or RecordNumber = 240 Then
 
-                ' Üzemórák és fejpozícionálással töltőtt órák száma (Csak az első két érték kerül feldolgozásra!)
+               ' Operating hours and number of hours spent with head positioning (Only the first two values are processed!)
                 For ByteDigit = 0 To 1
                     ValueSum += ToInt32(SmartData(SmartCount + SmartColunms(4) + ByteDigit)) * (256 ^ ByteDigit)
                 Next
 
-                ' Korrekciós bájt ellenőrzése (Ha a harmadik bájt nem nulla, akkor nem az órák száma van megadva!)
+                ' Check correction byte (If the third byte is not zero, then the number of hours is not specified!)
                 ValueDiff = ToInt32(SmartData(SmartCount + SmartColunms(4) + 2))
 
-                ' Korrekció elvégzése (A percek nem kerülnek kiszámításra!)
+                ' Make a correction (Minutes are not calculated!)
                 If ValueDiff <> 0 Then
                     ValueSum = Fix((ValueDiff * (256 ^ 2) + ValueSum) / (60 * 2))
                 End If
 
-                ' Nyers adat felülbírálása (összes óra beállítása)
+                ' Override raw data (set all clocks)
                 RecordRawValue = ValueSum
 
-                ' Értékek formázása: évek
+               ' Format values: years
                 ValueDiff = Fix(ValueSum / (365 * 24))
                 ValueSum = ValueSum - (ValueDiff * 365 * 24)
 
-                ' Évek kiírása (Csak akkor kerül kiírásra, ha nem nulla!)
+               ' Display of years (Only displayed if it is not zero!)
                 If ValueDiff <> 0 Then
                     ListFields(7) = ValueDiff.ToString + " " + GetLoc("Years") + ", "
                 Else
                     ListFields(7) = Nothing
                 End If
 
-                ' Értékek formázása: napok és órák
+              ' Format values: days and hours
                 ValueDiff = Fix(ValueSum / (24))
                 ValueSum = ValueSum - (ValueDiff * 24)
                 ListFields(7) += ValueDiff.ToString + " " + GetLoc("Days") + ", " + ValueSum.ToString + " " + GetLoc("Hours")
 
             Else
 
-                ' Általános rekordok (Alapértékek helyiérték szerinti összeadása!)
+                ' General records (Addition of basic values by local value!)
                 For ByteDigit = 0 To 4
                     ValueSum += ToInt32(SmartData(SmartCount + SmartColunms(4) + ByteDigit)) * (256 ^ ByteDigit)
                 Next
@@ -201,11 +201,11 @@ Public Class SMARTInfo
 
             End If
 
-            ' Figyelmeztető és kritikus rekordok kiértékelése
+            ' Evaluation of warning and critical records
             If RecordFlag(RecordNumber) = 1 Then
 
-                ' Figyelmeztető rekordok kezelése
-                ' Megjegyzés: A gyártói küszöböt figyelmen kívül hagyva, ha az érték eléri a beállított köszöböt, akkor figyelmeztetésre lesz módosítva!
+                ' Management of warning records
+                 ' Note: Ignoring the manufacturer's threshold, if the value reaches the set threshold, it will be changed to a warning!
                 If RecordRawValue >= WarningTreshold Then
                     RecordStatus = 1
                     ListFields(6) = GetLoc("SMARTWarning")
@@ -216,8 +216,8 @@ Public Class SMARTInfo
 
             ElseIf RecordFlag(RecordNumber) = 2 Then
 
-                ' Kritikus rekordok kezelése
-                ' Megjegyzés: A gyártói küszöböt figyelmen kívül hagyva, ha az érték eléri a beállított köszöböt, akkor kritikusra lesz módosítva!
+                ' Management of critical records
+                 ' Note: Ignoring the manufacturer's threshold, if the value reaches the set threshold, it will be changed to critical!
                 If RecordRawValue = 0 Then
                     RecordStatus = 0
                     ListFields(6) = GetLoc("SMARTOK")
